@@ -1,6 +1,6 @@
 
 import pygame
-#from stockfish import Stockfish
+#from stockfish import Stockfish 2
 import chess
 import ctypes
 import os
