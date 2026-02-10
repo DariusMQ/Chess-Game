@@ -1,6 +1,6 @@
 
 import pygame
-#from stockfish import Stockfish 3
+#from stockfish import Stockfish
 import chess
 import ctypes
 import os
@@ -93,12 +93,46 @@ HEIGHT = 900
 BOARD_COORDS = (100,130)
 BLACK_PLAYER_ICON_COORDS = (105, 60, 60, 60)
 WHITE_PLAYER_ICON_COORDS = (105, 760, 60, 60)
+
 BLACK_PLAYER_NAME_COORDS = (170, 60)
 WHITE_PLAYER_NAME_COORDS = (170, 760)
+
 BLACK_PLAYER_CLOCK_COORDS = (573, 85, 140, 35)
 WHITE_PLAYER_CLOCK_COORDS = (573, 755, 140, 35)
+
 BLACK_PLAYER_CLOCK_TEXT_COORDS = (710, 102.5)
 WHITE_PLAYER_CLOCK_TEXT_COORDS = (710, 772.5)
+
+RESULT_SCORE_COORDS = (900, 680)
+RESULT_MESSAGE_COORDS = (835, 720)
+RESULT_SUBTEXT_COORDS = (840, 700)
+
+SMALL_RADIUS = 10
+BIG_RADIUS = 30
+
+PROMOTION_PANEL_COORDS = (207,40,400,80)
+PROMOTION_PANEL_PIECES_Y = 40
+PROMOTION_PANEL_PIECES_X = 227
+PROMOTION_PANEL_PIECES_OFFSET = 95
+
+CAPTURED_PIECES_SPACING = 14
+CAPTURED_PIECES_EXTRA_SPACING = 20
+CAPTURED_PIECES_X = 170
+CAPTURED_PIECES_WHITE_Y = 80 
+CAPTURED_PIECES_BLACK_Y = 780
+
+BUTTON_1_X = 760
+BUTTON_2_X = 920
+BUTTON_Y = 750
+BUTTON_W = 150
+BUTTON_H = 70
+
+PAUSE_PANEL_COORDS = (500,300,200,330)
+PAUSE_BUTTON_X =525
+PAUSE_BUTTON_Y = 310
+PAUSE_BUTTON_W = 150
+PAUSE_BUTTON_H = 70
+PAUSE_BUTTON_OFFSET = 80
 
 screen = pygame.display.set_mode([WIDTH,HEIGHT])
 icon = pygame.image.load('./Icons/White_Pawn.png')
@@ -235,7 +269,7 @@ def draw_move_list():
         screen.blit(font.render(move['white_move'], True, 'black'), (845, y)) 
         screen.blit(font.render(move['black_move'], True, 'black'), (940, y))
 def draw_game_result():
-    global result
+    global result,RESULT_SCORE_COORDS, RESULT_MESSAGE_COORDS, RESULT_SUBTEXT_COORDS
 
     if result is None:
         if board.is_game_over():
@@ -252,12 +286,10 @@ def draw_game_result():
             result = "1/2-1/2"
 
     if result is None:
-        return  # No result to draw yet
+        return  
 
-    # Draw result score
-    screen.blit(bold_font.render(result, True, 'white'), (900, 680))
+    screen.blit(bold_font.render(result, True, 'white'), RESULT_SCORE_COORDS)
 
-    # Determine message
     message = None
 
     if board.is_game_over():
@@ -275,47 +307,50 @@ def draw_game_result():
     elif draw_flag:
         sub = "Draw"
 
-    # Draw messages
     if message:
-        screen.blit(font.render(message, True, 'black'), (835, 720))
-    screen.blit(font.render(sub, True, 'black'), (840, 700))
+        screen.blit(font.render(message, True, 'black'), RESULT_MESSAGE_COORDS)
+    screen.blit(font.render(sub, True, 'black'), RESULT_SUBTEXT_COORDS)
 def draw_highlights(): 
     if checked_square: 
         pygame.draw.rect(screen, 'red', checked_square) 
     if selection: 
         pygame.draw.rect(screen, 'gold', selection)
 def build_piece_sprites(fen):
+    global BOARD_COORDS
     black_images.empty() 
     white_images.empty()
     
-    X=103
-    Y=133
+    X=BOARD_COORDS[0] + 3
+    Y=BOARD_COORDS[1] + 3
+    offset = 77
+    newline = 103
 
     for c in fen.split(' ')[0]:
         if str(c).isdigit():
-            X+=77*int(c)
+            X+=offset*int(c)
             continue
 
         if c == '/': 
-            X = 103 
-            Y += 77 
+            X = newline 
+            Y += offset 
             continue 
         
         if c in PIECE_MAP: 
             image, ptype, is_white = PIECE_MAP[c] 
             group = white_images if is_white else black_images 
             group.add(Piece(image, ptype, is_white, X, Y)) 
-            X += 77
+            X += offset
 def build_move_dots():
     if not moves_to_select or move_images.sprites():
         return
 
+    global SMALL_RADIUS,BIG_RADIUS
     for move in moves_to_select:
         x, y, w, h = square_to_coords(chess.SQUARE_NAMES[move.to_square])
         is_capture = board.piece_at(move.to_square)
 
         dot_type = 'b' if is_capture else 's'
-        radius = 30 if is_capture else 10
+        radius = BIG_RADIUS if is_capture else SMALL_RADIUS
 
         move_images.add(SelectionDot(dot_type, 'gray', x, y, w, h, radius, move))
 def draw_move_dots():
@@ -387,13 +422,13 @@ def draw_moves_to_select():
     draw_move_dots()
 def draw_promotion():
     global promotion_images
-    pygame.draw.rect(screen,"#006000",(207,40,400,80))
+    pygame.draw.rect(screen,"#006000",PROMOTION_PANEL_COORDS)
     promotion_images.draw(screen)
 def draw_captured(): 
     draw_captured_pieces() 
     draw_material_difference()
 def draw_pause():
-    pygame.draw.rect(screen,'#008000',(500,300,200,330))
+    pygame.draw.rect(screen,'#008000',PAUSE_PANEL_COORDS)
     pause_buttons.draw(screen)
 
 def select_piece(rect):
@@ -411,17 +446,18 @@ def deselect_piece():
 def make_move(move,promote_to=None):
     global board,position,white_images,black_images,wait_for_promotion
     global message,san_number,san_moves,checked_square
+    global CAPTURED_PIECES_WHITE_Y, CAPTURED_PIECES_BLACK_Y,CAPTURED_PIECES_X
     if move.promotion != None and wait_for_promotion == None:
         if position.split(' ')[1] == 'w':
-            promotion_images.add(Piece(white_queen,chess.QUEEN,True,227,40))
-            promotion_images.add(Piece(white_rook,chess.ROOK,True,322,40))
-            promotion_images.add(Piece(white_bishop,chess.BISHOP,True,417,40))
-            promotion_images.add(Piece(white_knight,chess.KNIGHT,True,512,40))
+            promotion_images.add(Piece(white_queen,chess.QUEEN,True,PROMOTION_PANEL_PIECES_X,PROMOTION_PANEL_PIECES_Y))
+            promotion_images.add(Piece(white_rook,chess.ROOK,True,PROMOTION_PANEL_PIECES_X+PROMOTION_PANEL_PIECES_OFFSET,PROMOTION_PANEL_PIECES_Y))
+            promotion_images.add(Piece(white_bishop,chess.BISHOP,True,PROMOTION_PANEL_PIECES_X+PROMOTION_PANEL_PIECES_OFFSET*2,PROMOTION_PANEL_PIECES_Y))
+            promotion_images.add(Piece(white_knight,chess.KNIGHT,True,PROMOTION_PANEL_PIECES_X+PROMOTION_PANEL_PIECES_OFFSET*3,PROMOTION_PANEL_PIECES_Y))
         else:
-            promotion_images.add(Piece(black_queen,chess.QUEEN,False,227,40))
-            promotion_images.add(Piece(black_rook,chess.ROOK,False,322,40))
-            promotion_images.add(Piece(black_bishop,chess.BISHOP,False,417,40))
-            promotion_images.add(Piece(black_knight,chess.KNIGHT,False,512,40))
+            promotion_images.add(Piece(black_queen,chess.QUEEN,False,PROMOTION_PANEL_PIECES_X,PROMOTION_PANEL_PIECES_Y))
+            promotion_images.add(Piece(black_rook,chess.ROOK,False,PROMOTION_PANEL_PIECES_X+PROMOTION_PANEL_PIECES_OFFSET,PROMOTION_PANEL_PIECES_Y))
+            promotion_images.add(Piece(black_bishop,chess.BISHOP,False,PROMOTION_PANEL_PIECES_X+PROMOTION_PANEL_PIECES_OFFSET*2,PROMOTION_PANEL_PIECES_Y))
+            promotion_images.add(Piece(black_knight,chess.KNIGHT,False,PROMOTION_PANEL_PIECES_X+PROMOTION_PANEL_PIECES_OFFSET*3,PROMOTION_PANEL_PIECES_Y))
         wait_for_promotion = move
         return
     else:
@@ -449,62 +485,52 @@ def make_move(move,promote_to=None):
         match captured:
             case chess.PAWN: 
                 if not color: 
-                    offset = 170 
-                    white_images_small.append(Piece(white_pawn_small,captured,color,offset,780))
+                    white_images_small.append(Piece(white_pawn_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_BLACK_Y))
                 else: 
-                    offset = 170 
-                    black_images_small.append(Piece(black_pawn_small,captured,color,offset,80))
+                    black_images_small.append(Piece(black_pawn_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_WHITE_Y))
             case chess.KNIGHT: 
                 if not color: 
-                    offset = 170 
-                    white_images_small.append(Piece(white_knight_small,captured,color,offset,780))
+                    white_images_small.append(Piece(white_knight_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_BLACK_Y))
                 else: 
-                    offset = 170 
-                    black_images_small.append(Piece(black_knight_small,captured,color,offset,80))
+                    black_images_small.append(Piece(black_knight_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_WHITE_Y))
             case chess.BISHOP: 
                 if not color: 
-                    offset = 170 
-                    white_images_small.append(Piece(white_bishop_small,captured,color,offset,780))
+                    white_images_small.append(Piece(white_bishop_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_BLACK_Y))
                 else: 
-                    offset = 170 
-                    black_images_small.append(Piece(black_bishop_small,captured,color,offset,80))
+                    black_images_small.append(Piece(black_bishop_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_WHITE_Y))
             case chess.ROOK: 
                 if not color: 
-                    offset = 170 
-                    white_images_small.append(Piece(white_rook_small,captured,color,offset,780))
+                    white_images_small.append(Piece(white_rook_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_BLACK_Y))
                 else: 
-                    offset = 170 
-                    black_images_small.append(Piece(black_rook_small,captured,color,offset,80))
+                    black_images_small.append(Piece(black_rook_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_WHITE_Y))
             case chess.QUEEN: 
                 if not color: 
-                    offset = 170 
-                    white_images_small.append(Piece(white_queen_small,captured,color,offset,780))
+                    white_images_small.append(Piece(white_queen_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_BLACK_Y))
                 else: 
-                    offset = 170 
-                    black_images_small.append(Piece(black_queen_small,captured,color,offset,80))
+                    black_images_small.append(Piece(black_queen_small,captured,color,CAPTURED_PIECES_X,CAPTURED_PIECES_WHITE_Y))
         white_images_small.sort(key=lambda piece: piece.type) 
         black_images_small.sort(key=lambda piece: piece.type) 
 
-        x =170
+        x = CAPTURED_PIECES_X
         prev_type = None
 
         for piece in white_images_small:
             # Add extra spacing when piece type changes
             if prev_type is not None and piece.type != prev_type:
-                x += 20  # extra gap between types
-            piece.update_captured(x,80)
-            x += 14  # normal spacing
+                x += CAPTURED_PIECES_EXTRA_SPACING  # extra gap between types
+            piece.update_captured(x,CAPTURED_PIECES_WHITE_Y)
+            x += CAPTURED_PIECES_SPACING  # normal spacing
             prev_type = piece.type
 
-        x =170
+        x = CAPTURED_PIECES_X
         prev_type = None
 
         for piece in black_images_small:
             # Add extra spacing when piece type changes
             if prev_type is not None and piece.type != prev_type:
-                x += 20  # extra gap between types
-            piece.update_captured(x,780)
-            x += 10 + 4  # normal spacing
+                x += CAPTURED_PIECES_EXTRA_SPACING  # extra gap between types
+            piece.update_captured(x,CAPTURED_PIECES_BLACK_Y)
+            x += CAPTURED_PIECES_SPACING  # normal spacing
             prev_type = piece.type
         
         sound_capture.play()
@@ -544,7 +570,7 @@ def update_time():
     if time_flag: sound_notify.play()    
 
 def square_number(X,Y):
-    top,left = (133,103)
+    top,left = BOARD_COORDS[1]+3,BOARD_COORDS[0]+3
     #(133,210,287,364,441,518,595,672)
     #(103,180,257,334,441,488,565,642)
     return ((X-left)//77+(7-(Y-top)//77)*8)
@@ -581,8 +607,8 @@ def restart():
     white_images.remove(white_images.sprites())
     black_images.remove(black_images.sprites())
     buttons.remove(buttons.sprites())
-    buttons.add(Button("Resign","#006000",760,750,150,70,resign))
-    buttons.add(Button("Draw","#006000",920,750,150,70,draw))
+    buttons.add(Button("Resign","#006000",BUTTON_1_X,BUTTON_Y,BUTTON_W,BUTTON_H,resign))
+    buttons.add(Button("Draw","#006000",BUTTON_2_X,BUTTON_Y,BUTTON_W,BUTTON_H,draw))
     for image in white_images_small:
       image.kill()
     for image in black_images_small:
@@ -651,22 +677,22 @@ def p_restart():
     score = [0,0]
     pause = False
 
-buttons.add(Button("Resign","#006000",760,750,150,70,resign))
-buttons.add(Button("Draw","#006000",920,750,150,70,draw))
+buttons.add(Button("Resign","#006000",BUTTON_1_X,BUTTON_Y,BUTTON_W,BUTTON_H,resign))
+buttons.add(Button("Draw","#006000",BUTTON_2_X,BUTTON_Y,BUTTON_W,BUTTON_H,draw))
 def check_for_game_over():
     if (board.is_game_over() or time_flag != None or 
         resignation_flag != None or draw_flag) and buttons.sprites()[0].label != 'Rematch':
             buttons.remove(buttons.sprites())
-            buttons.add(Button('Rematch','#006000',760,750,150,70,restart))
-            buttons.add(Button('Quit','#006000',920,750,150,70,quit))
+            buttons.add(Button('Rematch','#006000',BUTTON_1_X,BUTTON_Y,BUTTON_W,BUTTON_H,restart))
+            buttons.add(Button('Quit','#006000',BUTTON_2_X,BUTTON_Y,BUTTON_W,BUTTON_H,quit))
             sound_notify.play()
 
 pause = False
 pause_buttons = pygame.sprite.Group()
-pause_buttons.add(Button('Resume',"#006000",525,310,150,70,resume))
-pause_buttons.add(Button('Menu',"#006000",525,390,150,70,lambda: print("Menu")))
-pause_buttons.add(Button('Restart',"#006000",525,470,150,70,p_restart))
-pause_buttons.add(Button('Quit',"#006000",525,550,150,70,quit))
+pause_buttons.add(Button('Resume',"#006000",PAUSE_BUTTON_X,PAUSE_BUTTON_Y,PAUSE_BUTTON_W,PAUSE_BUTTON_H,resume))
+pause_buttons.add(Button('Menu',"#006000",PAUSE_BUTTON_X,PAUSE_BUTTON_Y+PAUSE_BUTTON_OFFSET,PAUSE_BUTTON_W,PAUSE_BUTTON_H,lambda: print("Menu")))
+pause_buttons.add(Button('Restart',"#006000",PAUSE_BUTTON_X,PAUSE_BUTTON_Y+PAUSE_BUTTON_OFFSET*2,PAUSE_BUTTON_W,PAUSE_BUTTON_H,p_restart))
+pause_buttons.add(Button('Quit',"#006000",PAUSE_BUTTON_X,PAUSE_BUTTON_Y+PAUSE_BUTTON_OFFSET*3,PAUSE_BUTTON_W,PAUSE_BUTTON_H,quit))
 
 def draw_screen():
     screen.fill('#008000')
@@ -808,10 +834,3 @@ pygame.quit()
 for match in matches_series:
     print(match)
 print(f'{score[0]}-{score[1]}')
-
-
-# coordinates refactoring
-# fix material calculation
-# board flip
-# move table navigation
-# move variation mode (OPTIONAL)
