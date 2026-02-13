@@ -432,10 +432,12 @@ def draw_pause():
     pause_buttons.draw(screen)
 
 def select_piece(rect):
-    global selection,board,moves_to_select
-    selection = (rect.x,rect.y,rect.width,rect.height)
+    global selection,board,moves_to_select,chess_board
 
-    selected_square = chess.SQUARES[square_number(selection[0],selection[1])]
+    sq = square_number(rect.x,rect.y)
+    selected_square = chess.SQUARES[sq]
+    
+    selection = square_to_coords(chess.SQUARE_NAMES[sq])
     moves_to_select = [move for move in board.legal_moves if move.from_square == selected_square]
 def deselect_piece():
     global selection,moves_to_select
@@ -570,14 +572,38 @@ def update_time():
     if time_flag: sound_notify.play()    
 
 def square_number(X,Y):
-    top,left = BOARD_COORDS[1]+3,BOARD_COORDS[0]+3
-    #(133,210,287,364,441,518,595,672)
-    #(103,180,257,334,441,488,565,642)
-    return ((X-left)//77+(7-(Y-top)//77)*8)
+    left,top = BOARD_COORDS
+    top += chess_board.get_height()
+
+    step_w = chess_board.get_width()/8
+    step_h = chess_board.get_height()/8
+    
+    return int((X-left)//step_w +(top-Y)//step_h*8)
+
 def square_to_coords(sq):
+    
+    global BOARD_COORDS,chess_board
+
+    left,top = BOARD_COORDS
+    top += chess_board.get_height()
+    Y = int(sq[1])
+    X = "abcdefgh".find(sq[0])
+    step_w = chess_board.get_width()/8
+    step_h = chess_board.get_height()/8
+    
+    return (left+X*step_w,top-Y*step_h,step_w,step_h)
+def square_to_coords_new(sq):
+    
+    global BOARD_COORDS,chess_board
+
+    left,top = BOARD_COORDS
+    top += chess_board.get_height()
     Y = int(sq[1])-1
     X = "abcdefgh".find(sq[0])
-    return (103+X*77,672-Y*77,70,70)
+    step_w = chess_board.get_width()/8
+    step_h = chess_board.get_height()/8
+    
+    return (left+X*step_w,top-Y*step_h,step_w,step_h)
 
 pygame.sprite.Sprite.visible = True
 run_game = True
